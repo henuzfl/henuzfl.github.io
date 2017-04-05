@@ -25,7 +25,7 @@ github_username:    henuzfl
 highlighter: rouge
 permalink: pretty
 paginate: 10
-exclude: ["less","node_modules","Gruntfile.js","package.json","README.md","README.zh.md"]
+exclude: ["less","node_modules","Gruntfile.js","README.md"]
 anchorjs: false                          # if you want to customize anchor. check out line:181 of `post.html`
 
 
@@ -46,14 +46,6 @@ kramdown:
 
 
 
-# Disqus settings
-#disqus_username: _your_disqus_short_name_
-
-# Duoshuo settings
-# duoshuo_username: huxblog
-# Share component is depend on Comment so we can NOT use share only.
-# duoshuo_share: true                     # set to false if you want to use Comment without Sharing
-
 
 
 
@@ -66,7 +58,7 @@ ba_track_id: f0954df181a67396de03fb8cf8336d12
 
 # Sidebar settings
 sidebar: true                           # whether or not using Sidebar.
-sidebar-about-description: "写着代码唱着歌，挣点钱"
+sidebar-about-description: "写着代码，唱着歌，挣点钱"
 sidebar-avatar: /img/wizard_zfl.png     # use absolute URL, seeing it's used in both `/` and `/about/`
 
 

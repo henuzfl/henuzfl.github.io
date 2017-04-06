@@ -5,7 +5,7 @@ subtitle:   "平常使用sublime text3 的一些记录"
 date:       2017-03-31 00:00:00
 author:     "zfl"
 header-img: "img/post-st-use-guide.png"
-header-mask: 0.3
+header-mask: 0.6
 catalog:    true
 tags:
     - python

@@ -1,0 +1,181 @@
+---
+layout:     post
+title:      "拾遗--使用trie树实现英文单词的输入联想"
+subtitle:   "使用trie树实现英文单词的输入联想"
+date:       2017-04-23 12:00:00
+author:     "zfl"
+header-img: "img/post_data_structure.jpg"
+header-mask: 0.6
+catalog:    true
+tags:
+    - 数据结构
+    - trie树
+    - 字典树
+    - 算法
+    - python
+    - 拾遗
+---
+
+>整理自己以前写的python代码，发现写过一些有意思的东西，爬虫、数据结构、面试题等等，但是由于时间有些久远而且缺少文档注释，我自己看起来又像是新东西了，故此，写了这个拾遗系列，权当是自己重新学习的过程。  
+
+# 使用trie树实现英文单词的输入联想
+>Trie树，即字典树，又称单词查找树或键树，是一种树形结构，是一种哈希树的变种。典型应用是用于统计和排序大量的字符串（但不仅限于字符串），所以经常被搜索引擎系统用于文本词频统计。
+**三个基本性质：**
+1. 根节点不包含字符，除根节点外每一个节点都只包含一个字符。
+2. 从根节点到某一节点，路径上经过的字符连接起来，为该节点对应的字符串。
+3. 每个节点的所有子节点包含的字符都不相同。  
+  
+下图就是一颗trie树：
+![trie.jpg](http://upload-images.jianshu.io/upload_images/730879-eab4d2306d01f261.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)  
+**Trie的核心思想是空间换时间。利用字符串的公共前缀来降低查询时间的开销以达到提高效率的目的。**  
+## trie树的实现  
+> 主要包括插入和查询操作，插入、查找的时间复杂度为O(k), 其中k是字符串的长度，空间复杂度为$$ 26^k $$（往往达不到这么大）；在查询的过程中，使用到了最小堆来解决出现次数最多的N个单词。
+> 
+  
+### python代码以及注释
+```python
+#-*-coding:utf-8-*-
+'''
+   Trie树的例子
+'''
+from collections import deque
+import re
+from MinHeap import MinHeap
+
+
+
+
+# Trie树的结点
+class Node:
+
+    def __init__(self):
+        self.value = None
+        # 结点的子节点
+        self.children = set()
+        # 插入的单词经过这个字符的个数，用来统计以这个字符为前缀的数量
+        self.count = 0
+        # 加入为单词结点，插入的这个单词的数量
+        self.wordCount = 0
+
+
+# Trie树
+class Trie:
+
+    def __init__(self):
+        self.root = Node()
+        self.n = 5 # 返回以key为前缀出现次数前n多的单词
+
+    # 插入操作
+    def insert(self, key):
+        node = self.root
+        for a in key:
+            isFound = False
+            # 没经过一个节点，这个节点count+1，然后跳到下一层；如果是单词的最后一个节点，则wordCount+1，跳出循环
+            for subNode in node.children:
+                if subNode.value == a:
+                    subNode.count += 1
+                    if a == key[len(key)-1]:
+                        subNode.wordCount += 1
+                    isFound = True
+                    node = subNode
+                    break
+            # 如果没有找到这个字符，则新加入这个字符节点
+            if not isFound:
+                temp = Node()
+                temp.value = a
+                temp.count = 1
+                if a == key[len(key)-1]:
+                    temp.wordCount = 1
+                node.children.add(temp)
+                node = temp
+
+
+    '''
+        查询单词是否在Trie树中
+    '''
+
+    def search(self, key):
+        node = self.root
+        (exists, node) = self.searchNode(key)
+        if exists:
+            print("以%s为前缀的单词数量为：%d" % (key, node.count))
+            self.countResult(key, node)
+        else:
+            print("以%s为前缀的单词数量为：%d" % (key, 0))
+
+
+    '''
+        查找结点
+        返回结果：
+                是否存在
+                最后一个字符的节点
+    '''
+
+    def searchNode(self, key):
+        node = self.root
+        for a in key:
+            isFound = False
+            for subNode in node.children:
+                if subNode.value == a:
+                    node = subNode
+                    isFound = True
+                    break
+            if not isFound:
+                return False, None
+        return True, node
+
+
+    '''
+        获得最后统计的结果，包含以key为前缀的单词出现次数最多的前n个
+    '''
+
+    def countResult(self, key, node):
+        # 使用最小堆来实现topK问题
+        minHeap = MinHeap(self.n)
+        self.nodeInsertMinHeap(minHeap,key[:len(key)-1],node)
+        # 按照单词出现次数由大到小对最小堆进行排序
+        minHeap.heapSort()
+        # 输出最小堆的结果
+        minHeap.display()
+
+    '''
+        递归的找到所有以key为前缀的单词，并插入到最小堆
+    '''
+    def nodeInsertMinHeap(self,minHeap,key,node):
+        key += node.value
+        if node.wordCount > 0:
+            minHeap.minHeapInsert(key, node.wordCount)
+        for temp in node.children:
+            self.nodeInsertMinHeap(minHeap,key, temp)
+```  
+
+### 测试实例
+```python
+# 简易的获得英文文档的全部单词
+def words(path):
+    with open(path, 'r') as f:
+        str = f.read()
+        return re.findall('[a-z]+', str.lower())
+
+if __name__ == '__main__':
+    trie = Trie()
+    # 使用全本的福尔摩斯作为英文文本输入
+    words = words("C:\\testData\\Sherlock.txt")
+    for word in words:
+        trie.insert(word)
+    trie.search('she')
+
+```
+执行结果为：
+```python
+以she为前缀的单词数量为：571
+she  433
+sherlock  101
+sheet  12
+shelf  5
+sheets  3
+```
+
+
+## 总结
+Trie树是一种非常重要的数据结构，它在信息检索，字符串匹配等领域有广泛的应用，同时，它也是很多算法和复杂数据结构的基础，如后缀树，AC自动机等。

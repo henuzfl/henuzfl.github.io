@@ -178,4 +178,5 @@ sheets  3
 
 
 ## 总结
+具体trie树的实现实例为：[Trie](https://github.com/henuzfl/funcCode/blob/master/Trie.py) ，最小堆的实现实例：[MinHeap](https://github.com/henuzfl/funcCode/blob/master/MinHeap.py)。  
 Trie树是一种非常重要的数据结构，它在信息检索，字符串匹配等领域有广泛的应用，同时，它也是很多算法和复杂数据结构的基础，如后缀树，AC自动机等。

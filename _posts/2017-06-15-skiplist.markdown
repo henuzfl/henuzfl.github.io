@@ -1,0 +1,32 @@
+---
+layout:     post
+title:      "SKipList学习笔记以及实现"
+subtitle:   "SKipList学习笔记以及实现"
+date:       2017-06-15 12:00:00
+author:     "zfl"
+header-img: "img/post_data_structure.jpg"
+header-mask: 0.6
+catalog:    true
+tags:
+    - 数据结构
+    - 链表
+    - SkipList
+    - 算法
+    - python
+---
+
+# SKipList学习笔记以及实现
+在上一篇文章末尾，提了一下跳表这个数据结构，是排序平衡树很好的替代品。但是，这样一种重要的数据结构在学校的算法课以及《算法导论》中都没有提及（据说在第五版会有），反而都用很大的篇幅去讲解实现起来特别复杂的红黑树。  
+在java的concurrent中ConcurrentSkipListMap和ConcurrentSkipListSet是用SkipList实现的，而且通过CAS模式实现了线程安全，是ConcurrentTreeMap和ConcurrentTreeSet的替代品。在python的标准库中没有实现，但是python的第三方库pyskiplist有实现，秉承着不重复制造轮子的原则如果有需要就直接使用这个库了。  
+但是，如果是学习的话就需要好好弄清这个数据结构的来龙去脉，遂有此文。
+## SkipList的原理
+Skiplist（跳跃表）是一种可以替代平衡树的数据结构，redis、LevelDB等都是用Skiplist作为底层的核心数据结构，虽然SkipList在最坏的情况下退化为单链表时间复杂度为O(n)，大部分情况下和排序平衡树有着相同的效率，主要的是作为替代品相较于排序平衡树有实现简单、内存占用量小，特别是在面对多线程的问题时，由于平衡树在执行插入、删除、更新时需要rebalance的操作，这个操作时需要锁定整个表的，锁的粒度是比较大的，这就很影响性能，而Skiplist的使用链表为底层实现的，插入、删除操作都只影响前置节点、后置节点，很便于使用CAS这种方式实现线程安全（详情参见JDK中ConcurrentSkipListMap和ConcurrentSkipListSet的具体实现）。  
+SkipList说白了是在链表上加入索引结构的一种数据结构，典型空间换时间的策略。链表是最简单的一种数据结构，采用何种方式的索引加持就可以成为一种高效、实用的SkipList呢？我们接下来一探究竟。  
+下图是传统意义上的有序链表：  
+![list1.png](http://upload-images.jianshu.io/upload_images/730879-b00b891f3836d271.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)  
+查找的时间复杂度都是O(n),插入、删除依赖查找，时间复杂度O(n)，下图所展示的就是一种跳跃表，在一些节点上面增加了索引，通过查找索引就可以将查找的时间复杂度降为O(n/2)，下图演示了查找数字12的过程，第一步先和6比较，大于6则第二步和9比较，大于9第三步和17比较，小于17说明12在9和17之间，第四步退到9，第五步再和12比较，可以看出这次查找过程跳过了3,7的比较；
+![list2.png](http://upload-images.jianshu.io/upload_images/730879-7fd0e411dfdcc98a.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)  
+
+
+
+

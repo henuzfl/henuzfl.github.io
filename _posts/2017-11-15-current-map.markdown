@@ -19,7 +19,7 @@ tags:
 ### 1 锁分段
 > 对一组独立对象上的锁进行分解，比如ConcurrentHashMap的实现使用了一个包含16个锁的数组，每个锁保护所有散列桶的1/16，其中N个散列桶由N mod 16个锁来保护。假如散列函数合理，并且关键字能够实现均匀分布，那么这大约能把对锁的请求减少到原来的1/16。 
 
-在jdk中，ConcurrentHashMap是由**Segment**数组结构和HashEntry数组结构组成。Segment是一种可重入锁ReentrantLock，在ConcurrentHashMap里扮演锁的角色，HashEntry则用于存储键值对数据。一个ConcurrentHashMap里包含一个Segment数组，Segment的结构和HashMap类似，是一种数组和链表结构， 一个Segment里包含一个HashEntry数组，每个HashEntry是一个链表结构的元素， 每个Segment守护者一个HashEntry数组里的元素,当对HashEntry数组的数据进行修改时，必须首先获得它对应的Segment锁。结构如下：
+在jdk中，ConcurrentHashMap是由**Segment**数组结构和HashEntry数组结构组成。Segment是一种**可重入锁**ReentrantLock，在ConcurrentHashMap里扮演锁的角色，HashEntry则用于存储键值对数据。一个ConcurrentHashMap里包含一个Segment数组，Segment的结构和HashMap类似，是一种数组和链表结构， 一个Segment里包含一个HashEntry数组，每个HashEntry是一个链表结构的元素， 每个Segment守护者一个HashEntry数组里的元素,当对HashEntry数组的数据进行修改时，必须首先获得它对应的Segment锁。结构如下：
 ![image.png](http://upload-images.jianshu.io/upload_images/730879-a2d4d712104f6cec.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 ### 2 jdk7中的关键源码
 

@@ -30,6 +30,8 @@ SkipList说白了是在链表上加入索引结构的一种数据结构，典型
 其实，上面基本上就是跳跃表的思想，每一个节点不单单只包含指向下一个节点的指针，可能包含很**多个指向后续节点**的指针，这样就可以跳过一些不必要的节点，从而加快查找、删除等操作。  
 至此，原理是不是很简单的，链表上节点随机的增加一些指针指向的后续节点，下面我们重点看一下jdk是如何实现的。  
 ## 源码解析    
+这篇文章主要是为了讲明白实现算法的，jdk源码实现中的CAS部分有很大的干扰作用，因此，在下面的源码解析中我都去掉了控制CAS这些代码，可以参照源码看。  
+
 * jdk数据结构示意图：
     ![image.png](http://upload-images.jianshu.io/upload_images/730879-0d99c2f112743403.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)  
 ### 初始化
@@ -51,33 +53,24 @@ SkipList说白了是在链表上加入索引结构的一种数据结构，典型
     private Node<K,V> findPredecessor(Object key, Comparator<? super K> cmp) {
         if (key == null)
             throw new NullPointerException(); 
-        for (;;) {
-            // 从头索引开始，直到找到前驱节点才跳出循环，我们把q叫做当前索引，r叫做右索引
-            for (Index<K,V> q = head, r = q.right, d;;) {
-                if (r != null) {
-                    Node<K,V> n = r.node;
-                    K k = n.key;
-                    if (n.value == null) {
-                        if (!q.unlink(r))
-                            break;           
-                        r = q.right;         
-                        continue;
-                    }
-                    if (cpr(cmp, key, k) > 0) {
-                        q = r;
-                        r = r.right;
-                        continue;
-                    }
+        // 从头索引节点开始，查找的方向是先右后下，如果存在右索引，判断右索引节点的key与给定key的大小，如果比给定key小，继续向右，否则向下。直到到达第一层的索引，返回该索引对应的节点。     
+        for(Index<K,V> q = head, r = q.right, d;;){
+            if (r != null) {
+                Node<K,V> n = r.node;
+                K k = n.key;
+                if (cpr(cmp, key, k) > 0) {
+                    q = r;
+                    r = r.right;
+                    continue;
                 }
-                if ((d = q.down) == null)
-                    return q.node;
-                q = d;
-                r = d.right;
             }
+            if ((d = q.down) == null)
+                return q.node;
+            q = d;
+            r = d.right;
         }
     }
 ```  
-具体的实现方法是，从头索引开始，如果当前索引q右索引为r，如果r存在，那么比较当前key与r对应节点n的key值，如果比它大，那么r成为当前节点q，继续循环；如果比它小，跳出循环，从当前索引q开始向下找到索引节点d，如果索引d为空，说明到达了第一层，跳出循环，如果索引d不为空，则继续向下查找。
 上述示例中，我们要找到key=8的processor步骤如下图：
 ![捕获.PNG](http://upload-images.jianshu.io/upload_images/730879-a5d17c07230febc2.PNG?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 ### 查询操作
@@ -86,21 +79,13 @@ SkipList说白了是在链表上加入索引结构的一种数据结构，典型
         if (key == null)
             throw new NullPointerException();
         Comparator<? super K> cmp = comparator;
-        outer: for (;;) {
-            for (Node<K,V> b = findPredecessor(key, cmp), n = b.next;;) {
+        // 第一步找到Predecessor节点
+        for (Node<K,V> b = findPredecessor(key, cmp), n = b.next;;) {
                 Object v; int c;
                 if (n == null)
                     break outer;
                 // 实现cas代码段，判断数据是否由其他线程修改
                 Node<K,V> f = n.next;
-                if (n != b.next)                // 读取数据不一致的情况
-                    break;
-                if ((v = n.value) == null) {    // n被删除
-                    n.helpDelete(b, f);
-                    break;
-                }
-                if (b.value == null || v == n)  // b 被删除
-                    break;
                 // 如果找到该节点，则返回该节点的value值
                 if ((c = cpr(cmp, key, n.key)) == 0) {
                     @SuppressWarnings("unchecked") V vv = (V)v;
@@ -108,11 +93,10 @@ SkipList说白了是在链表上加入索引结构的一种数据结构，典型
                 }
                 // 如果比给定的key值还要小，则说明链表中不存在该数据，返回null
                 if (c < 0)
-                    break outer;
+                    break;
                 // 如果比给定key值大，那么继续向后续节点搜索
                 b = n;
                 n = f;
-            }
         }
         return null;
     }
@@ -133,43 +117,29 @@ OK，了解完findPredecessor操作之后再看doGet操作就比较清晰明了�
         if (key == null)
             throw new NullPointerException();
         Comparator<? super K> cmp = comparator;
-        outer: for (;;) {
-            for (Node<K,V> b = findPredecessor(key, cmp), n = b.next;;) {
-                if (n != null) {
-                    Object v; int c;
-                    Node<K,V> f = n.next;
-                    // 实现cas代码段，如果有其他线程修改的，略过不看
-                    if (n != b.next)               // 读取数据不一致的情况
-                        break;
-                    if ((v = n.value) == null) {   // n已经被删除了
-                        n.helpDelete(b, f);
-                        break;
-                    }
-                    if (b.value == null || v == n) // b被删除
-                        break;
-                    // 如果比给定的key值大，则继续向后检索    
-                    if ((c = cpr(cmp, key, n.key)) > 0) {
-                        b = n;
-                        n = f;
-                        continue;
-                    }
-                    // 如果与给定的key值相等，如果不存在才插入，直接返回结果；如果不是不存在才插入，那么将value赋值给节点n，返回结果。插入操作结束。
-                    if (c == 0) {
-                        if (onlyIfAbsent || n.casValue(v, value)) {
-                            @SuppressWarnings("unchecked") V vv = (V)v;
-                            return vv;
-                        }
-                        break; // restart if lost race to replace value
-                    }
-                    // else c < 0; fall through
+        for (Node<K,V> b = findPredecessor(key, cmp), n = b.next;;) {
+            if (n != null) {
+                Object v; int c;
+                Node<K,V> f = n.next;
+                // 如果比给定的key值大，则继续向后检索    
+                if ((c = cpr(cmp, key, n.key)) > 0) {
+                    b = n;
+                    n = f;
+                    continue;
                 }
-
-                // 将新节点插入到b与n之间    
-                z = new Node<K,V>(key, value, n);
-                if (!b.casNext(n, z))
-                    break;         // restart if lost race to append to b
-                break outer;
+                // 如果与给定的key值相等，如果不存在才插入，直接返回结果；如果存在也插入，那么将value赋值给节点n，返回结果。插入操作结束。
+                if (c == 0) {
+                    if (onlyIfAbsent || n.casValue(v, value)) {
+                        @SuppressWarnings("unchecked") V vv = (V)v;
+                        return vv;
+                    }
+                }
             }
+
+            // 将新节点插入到b与n之间    
+            z = new Node<K,V>(key, value, n);
+            if (!b.casNext(n, z))
+                break;
         }
 ```  
 * **第二步：新节点开始创建索引节点**  
@@ -188,19 +158,17 @@ OK，了解完findPredecessor操作之后再看doGet操作就比较清晰明了�
                     idx = new Index<K,V>(z, idx, null);
             }
             // 如果level大于目前的层级数，那么每次整体层级数增加一层
-            else { // try to grow by one level
-                level = max + 1; // hold in array and later pick the one to use
-                // 从level从第一层向上开始创建新建节点的索引节点
+            else { 
+                level = max + 1;
+                // 从level从第一层向上开始创建新建节点的索引
                 @SuppressWarnings("unchecked")Index<K,V>[] idxs =
                     (Index<K,V>[])new Index<?,?>[level+1];
                 for (int i = 1; i <= level; ++i)
                     idxs[i] = idx = new Index<K,V>(z, idx, null);
-
-                for (;;) {
-                    h = head;
-                    int oldLevel = h.level;
-                    if (level <= oldLevel) // lost race to add level
-                        break;
+                // 更新头索引
+                h = head;
+                int oldLevel = h.level;
+                if (level > oldLevel){
                     // 创建新头索引节点
                     HeadIndex<K,V> newh = h;
                     Node<K,V> oldbase = h.node;
@@ -217,47 +185,38 @@ OK，了解完findPredecessor操作之后再看doGet操作就比较清晰明了�
 ```
 * **第三步：索引节点的连接**
 ```java
-            splice: for (int insertionLevel = level;;) {
-                // 从新加入节点的索引节点的level开始
-                int j = h.level;
-                // 从头索引节点开始，建立到新加入节点的索引节点的连接
-                for (Index<K,V> q = h, r = q.right, t = idx;;) {
-                    if (q == null || t == null)
-                        break splice;
-                    // 如果当前索引节点的右索引节点不为空，那么判断是否需要向右继续查找，找到距离当前节点索引节点最接近的索引节点
-                    if (r != null) {
-                        Node<K,V> n = r.node;
-                        // compare before deletion check avoids needing recheck
-                        int c = cpr(cmp, key, n.key);
-                        if (n.value == null) {
-                            if (!q.unlink(r))
-                                break;
-                            r = q.right;
-                            continue;
-                        }
-                       //如果给定key大于当前右索引节点的值，那么继续向右查找 
-                        if (c > 0) {
-                            q = r;
-                            r = r.right;
-                            continue;
-                        }
+            int insertionLevel = level;  // 新建索引的层级
+            int j = h.level; //目前的整体层级
+            // 从头索引节点开始，建立到新加入节点的索引节点的连接
+            for (Index<K,V> q = h, r = q.right, t = idx;;) {
+                // 如果当前索引节点的右索引节点不为空，那么判断是否需要向右继续查找，找到距离当前节点索引节点最接近的索引节点
+                if (r != null) {
+                    Node<K,V> n = r.node;
+                    int c = cpr(cmp, key, n.key);
+                    //如果给定key大于当前右索引节点的值，那么继续向右查找 
+                    if (c > 0) {
+                        q = r;
+                        r = r.right;
+                        continue;
                     }
-
-                    // 如果当前左边的索引与当前节点的索引在同一层级上，则进行关联
-                    if (j == insertionLevel) {
-                        if (!q.link(r, t))
-                            break; // restart
-                        if (t.node.value == null) {
-                            findNode(key);
-                            break splice;
-                        }
-                        if (--insertionLevel == 0)
-                            break splice;
-                    }
-                    if (--j >= insertionLevel && j < level)
-                        t = t.down;
-                    q = q.down;
-                    r = q.right;
                 }
+                // 如果当前左边的索引与当前节点的索引在同一层级上，则进行关联
+                if (j == insertionLevel) {
+                    q.link(r, t)  // 之前是q->r,现在link之后变成q->t->r
+                    // 新加入索引降一层，如果当前是第一层，那么退出循环
+                    if (--insertionLevel == 0)
+                        break;
+                }
+                // 当前新加入索引以及当前需要连接的左边的索引都降一层进行循环
+                if (--j >= insertionLevel && j < level)
+                    t = t.down;
+                q = q.down;
+                r = q.right;
             }
-```
+```  
+
+
+### 5 参考资料
+* 《Java并发编程实战》
+*  jdk7 源码 
+*  Pugh W. Skip lists: A probabilistic alternative to balanced trees[C]// The Workshop on Algorithms and Data Structures. 1989:668-676.

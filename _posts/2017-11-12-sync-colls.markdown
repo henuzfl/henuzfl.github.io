@@ -21,7 +21,7 @@ tags:
 2. Collections类中提供的静态工厂方法创建的类，比如通过Collections.synchronizedList创建一个线程安全的list。  
 
 
-这些同步容器都是使用**synchronized**进行了同步，Vector类似于ArrayList，可以看成可以自增的数组。Stack继承与Vector，其实就是Vector的特殊实现。Hashtable很奇怪，命名方式都不符合Java的规范，可见有多老，使用同步实现了Map接口。Collections的静态工厂方法就是将线程不安全的List、Set、Map使用**代理设计模式**增加了同步操作。  
+这些同步容器都是使用**synchronized**进行了同步，Vector类似于ArrayList，可以看成可以自增的数组。Stack继承与Vector，其实就是Vector的特殊实现。Hashtable很奇怪，命名方式都不符合Java的规范，可见有多老，使用同步实现了Map接口。Collections的静态工厂方法就是将线程不安全的List、Set、Map使用**装饰器设计模式**增加了同步操作。  
 
 ### 1 安全性问题  
 
